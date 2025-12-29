@@ -19,7 +19,7 @@ public class UsuarioConverter {
                 .email(usuarioDTO.getEmail())
                 .senha(usuarioDTO.getSenha())
                 .enderecos(usuarioDTO.getEndereco() != null ? paraListaEndereco(usuarioDTO.getEndereco()) : null)
-                .telefones(usuarioDTO.getTelefone() != null ? paraListaTelefones(usuarioDTO.getTelefone()) : null)
+                .telefones(usuarioDTO.getTelefone() != null ? paraListaTelefones(usuarioDTO.getTelefone()) : null   )
                 .build();
     }
 

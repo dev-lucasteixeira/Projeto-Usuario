@@ -23,6 +23,7 @@ public class SecurityConfig {
     // Instâncias de JwtUtil e UserDetailsService injetadas pelo Spring
     private final JwtUtil jwtUtil;
     private final UserDetailsService userDetailsService;
+    public static final String SECURITY_SCHEME = "bearerAuth";
 
     // Construtor para injeção de dependências de JwtUtil e UserDetailsService
     @Autowired
@@ -40,9 +41,10 @@ public class SecurityConfig {
         http
                 .csrf(AbstractHttpConfigurer::disable) // Desativa proteção CSRF para APIs REST (não aplicável a APIs que não mantêm estado)
                 .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers("/usuario/login").permitAll() // Permite acesso ao endpoint de login sem autenticação
-                        .requestMatchers(HttpMethod.GET, "/auth").permitAll()// Permite acesso ao endpoint GET /auth sem autenticação
-                        .requestMatchers(HttpMethod.POST, "/usuario").permitAll() // Permite acesso ao endpoint POST /usuario sem autenticação
+                        .requestMatchers("/v3/api-docs/**", "/swaagger-ui/", "swagger-ui.html").permitAll()
+                        .requestMatchers("/usuario/login").permitAll()// Permite acesso ao endpoint GET /auth sem autenticação
+                        .requestMatchers(HttpMethod.POST, "/usuario").permitAll()// Permite acesso ao endpoint POST /usuario sem autenticação
+                        .requestMatchers(HttpMethod.GET, "/usuario/endereco/**").permitAll()
                         .requestMatchers("/usuario/**").authenticated() // Requer autenticação para qualquer endpoint que comece com /usuario/
                         .anyRequest().authenticated() // Requer autenticação para todas as outras requisições
                 )
