@@ -1,5 +1,6 @@
 package com.lucasteixeira.infrastructure.entity;
 
+import com.lucasteixeira.business.dto.UsuarioDTO;
 import jakarta.persistence.*;
 import lombok.*;
 import org.springframework.security.core.GrantedAuthority;
@@ -45,5 +46,11 @@ public class Usuario implements UserDetails {
     @Override
     public String getUsername() {
         return email;
+    }
+
+    private Usuario(UsuarioDTO usuarioDTO){
+        this.nome = usuarioDTO.getNome();
+        this.email = usuarioDTO.getEmail();
+        this.senha = usuarioDTO.getSenha();
     }
 }
