@@ -11,7 +11,6 @@ import com.lucasteixeira.infrastructure.entity.Usuario;
 import com.lucasteixeira.infrastructure.repository.EnderecoRepository;
 import com.lucasteixeira.infrastructure.repository.TelefoneRepository;
 import com.lucasteixeira.infrastructure.repository.UsuarioRepository;
-import com.lucasteixeira.infrastructure.security.JwtUtil;
 import com.lucasteixeira.producers.UserProducer;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

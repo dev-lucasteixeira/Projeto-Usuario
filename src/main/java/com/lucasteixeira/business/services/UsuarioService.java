@@ -10,24 +10,25 @@ import com.lucasteixeira.infrastructure.entity.Telefone;
 import com.lucasteixeira.infrastructure.entity.Usuario;
 import com.lucasteixeira.infrastructure.exceptions.ConflictException;
 import com.lucasteixeira.infrastructure.exceptions.ResourceNotFoundException;
-import com.lucasteixeira.infrastructure.exceptions.UnauhthorizedException;
 import com.lucasteixeira.infrastructure.repository.EnderecoRepository;
 import com.lucasteixeira.infrastructure.repository.TelefoneRepository;
 import com.lucasteixeira.infrastructure.repository.UsuarioRepository;
-import com.lucasteixeira.infrastructure.security.JwtUtil;
 import com.lucasteixeira.producers.UserProducer;
+import jakarta.ws.rs.core.Response;
 import lombok.RequiredArgsConstructor;
+import org.keycloak.OAuth2Constants;
+import org.keycloak.admin.client.Keycloak;
+import org.keycloak.admin.client.KeycloakBuilder;
+import org.keycloak.representations.idm.CredentialRepresentation;
+import org.keycloak.representations.idm.UserRepresentation;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.authorization.AuthorizationDeniedException;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+
+import java.util.Collections;
 
 @Service
 @RequiredArgsConstructor
@@ -36,7 +37,6 @@ public class UsuarioService {
     private final UsuarioRepository usuarioRepository;
     private final UsuarioConverter usuarioConverter;
     private final PasswordEncoder passwordEncoder;
-    private final JwtUtil jwtUtil;
     private final EnderecoRepository enderecoRepository;
     private final TelefoneRepository telefoneRepository;
     private final AuthenticationManager authenticationManager;
@@ -45,14 +45,45 @@ public class UsuarioService {
 
     public UsuarioDTO salvaUsuario(UsuarioDTO usuarioDTO){
         emailExiste(usuarioDTO.getEmail());
+        Keycloak keycloak = KeycloakBuilder.builder()
+                .serverUrl("http://localhost:8085")
+                .realm("task-scheduler") // Seu realm
+                .grantType(OAuth2Constants.CLIENT_CREDENTIALS) // Recomendado para serviço-a-serviço
+                .clientId("task-scheduler-client")
+                .clientSecret("sayD7JaC4ycNqNm7MB7LBuQFwSU8cPri") // Pegue na aba Credentials do Client
+                .build();
+
+        UserRepresentation user = new UserRepresentation();
+        user.setEnabled(true);
+        user.setUsername(usuarioDTO.getEmail());
+        user.setEmail(usuarioDTO.getEmail());
+        user.setFirstName(usuarioDTO.getNome());
+        user.setLastName("User");
+        user.setEmailVerified(true);
+
+
+        CredentialRepresentation passwordCred = new CredentialRepresentation();
+        passwordCred.setTemporary(false);
+        passwordCred.setType(CredentialRepresentation.PASSWORD);
+        passwordCred.setValue(usuarioDTO.getSenha()); // Senha que veio do Postman
+        user.setCredentials(Collections.singletonList(passwordCred));
+
         usuarioDTO.setSenha(passwordEncoder.encode(usuarioDTO.getSenha()));
         Usuario usuario = usuarioConverter.paraUsuario(usuarioDTO);
         usuario = usuarioRepository.save(usuario);
         userProducer.publishMessageEmail(usuario);
+
+
+
+        Response response = keycloak.realm("task-scheduler").users().create(user);
+
+        if (response.getStatus() != 201) {
+            throw new RuntimeException("Erro ao criar usuário no Keycloak: " + response.getStatus());
+        }
         return usuarioConverter.paraUsuarioDTO(usuario);
     }
 
-    public String autenticarUsuario(UsuarioDTO usuarioDTO) {
+    /*public String autenticarUsuario(UsuarioDTO usuarioDTO) {
         try {
             Authentication authentication = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(usuarioDTO.getEmail(),
@@ -63,17 +94,12 @@ public class UsuarioService {
         } catch (BadCredentialsException | UsernameNotFoundException | AuthorizationDeniedException e) {
             throw new UnauhthorizedException("Usuário ou senha inválidos: ", e.getCause());
         }
-    }
+    }*/
 
 
     public void emailExiste(String email){
-        try{
-            boolean existe = verificaEmailExistente(email);
-            if(existe){
-                throw new ConflictException("Email já cadastrado" + email);
-            }
-        }catch (ConflictException e ){
-            throw new ConflictException("Email já cadrastado" + e.getCause());
+        if (verificaEmailExistente(email)) {
+            throw new ConflictException("Email já cadastrado: " + email);
         }
     }
 
@@ -86,16 +112,9 @@ public class UsuarioService {
 
     @Cacheable(value = "users", key = "#email")
     public UsuarioDTO buscaUsuarioPorEmail(String email){
-        try {
-            return usuarioConverter.paraUsuarioDTO(
-                    usuarioRepository.findByEmail(email)
-                            .orElseThrow(
-                    () -> new ResourceNotFoundException("Email não encontrado" + email)
-                            )
-            );
-        }catch (ResourceNotFoundException e ){
-            throw new ResourceNotFoundException("Email não encontrado" + email);
-        }
+        return usuarioRepository.findByEmail(email)
+                .map(usuarioConverter::paraUsuarioDTO)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado com o email: " + email));
     }
 
     @CacheEvict(value = "users", key = "#email")
