@@ -19,14 +19,11 @@ public class SecurityConfig {
         http
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
-                        // O cadastro inicial deve ser público para o usuário poder se registrar
                         .requestMatchers(HttpMethod.POST, "/usuario").permitAll()
-                        // Buscas de CEP podem ser públicas
                         .requestMatchers(HttpMethod.GET, "/usuario/endereco/{cep}").permitAll()
                         // Todo o resto exige o token do Keycloak
                         .anyRequest().authenticated()
                 )
-                // Ativa a validação automática do token JWT do Keycloak
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()));
 
         return http.build();
