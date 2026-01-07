@@ -46,40 +46,42 @@ public class UsuarioService {
 
     public UsuarioDTO salvaUsuario(UsuarioDTO usuarioDTO){
         emailExiste(usuarioDTO.getEmail());
-        Keycloak keycloak = KeycloakBuilder.builder()
+        Usuario usuario;
+        try (Keycloak keycloak = KeycloakBuilder.builder()
                 .serverUrl(keycloakConfig.getAuthServerUrl())
                 .realm(keycloakConfig.getRealm())
                 .grantType(OAuth2Constants.CLIENT_CREDENTIALS)
                 .clientId(keycloakConfig.getClientId())
                 .clientSecret(keycloakConfig.getClientSecret())
-                .build();
+                .build()) {
 
-        UserRepresentation user = new UserRepresentation();
-        user.setEnabled(true);
-        user.setUsername(usuarioDTO.getEmail());
-        user.setEmail(usuarioDTO.getEmail());
-        user.setFirstName(usuarioDTO.getNome());
-        user.setLastName("User");
-        user.setEmailVerified(true);
-
-
-        CredentialRepresentation passwordCred = new CredentialRepresentation();
-        passwordCred.setTemporary(false);
-        passwordCred.setType(CredentialRepresentation.PASSWORD);
-        passwordCred.setValue(usuarioDTO.getSenha());
-        user.setCredentials(Collections.singletonList(passwordCred));
-
-        usuarioDTO.setSenha(passwordEncoder.encode(usuarioDTO.getSenha()));
-        Usuario usuario = usuarioConverter.paraUsuario(usuarioDTO);
-        usuario = usuarioRepository.save(usuario);
-        userProducer.publishMessageEmail(usuario);
+            UserRepresentation user = new UserRepresentation();
+            user.setEnabled(true);
+            user.setUsername(usuarioDTO.getEmail());
+            user.setEmail(usuarioDTO.getEmail());
+            user.setFirstName(usuarioDTO.getNome());
+            user.setLastName("User");
+            user.setEmailVerified(true);
 
 
+            CredentialRepresentation passwordCred = new CredentialRepresentation();
+            passwordCred.setTemporary(false);
+            passwordCred.setType(CredentialRepresentation.PASSWORD);
+            passwordCred.setValue(usuarioDTO.getSenha());
+            user.setCredentials(Collections.singletonList(passwordCred));
 
-        Response response = keycloak.realm("task-scheduler").users().create(user);
+            usuarioDTO.setSenha(passwordEncoder.encode(usuarioDTO.getSenha()));
+            usuario = usuarioConverter.paraUsuario(usuarioDTO);
+            usuario = usuarioRepository.save(usuario);
+            userProducer.publishMessageEmail(usuario);
 
-        if (response.getStatus() != 201) {
-            throw new RuntimeException("Erro ao criar usuário no Keycloak: " + response.getStatus());
+
+            try (Response response = keycloak.realm("task-scheduler").users().create(user)) {
+
+                if (response.getStatus() != 201) {
+                    throw new RuntimeException("Erro ao criar usuário no Keycloak: " + response.getStatus());
+                }
+            }
         }
         return usuarioConverter.paraUsuarioDTO(usuario);
     }
