@@ -1,7 +1,7 @@
 package com.lucasteixeira.business.services;
 
 
-import com.lucasteixeira.business.converter.UsuarioConverter;
+import com.lucasteixeira.business.mappers.UsuarioMapper;
 import com.lucasteixeira.business.dto.EnderecoDTO;
 import com.lucasteixeira.business.dto.TelefoneDTO;
 import com.lucasteixeira.business.dto.UsuarioDTO;
@@ -34,7 +34,7 @@ import org.springframework.stereotype.Service;
 public class UsuarioService {
 
     private final UsuarioRepository usuarioRepository;
-    private final UsuarioConverter usuarioConverter;
+    private final UsuarioMapper usuarioMapper;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
     private final EnderecoRepository enderecoRepository;
@@ -46,10 +46,10 @@ public class UsuarioService {
     public UsuarioDTO salvaUsuario(UsuarioDTO usuarioDTO){
         emailExiste(usuarioDTO.getEmail());
         usuarioDTO.setSenha(passwordEncoder.encode(usuarioDTO.getSenha()));
-        Usuario usuario = usuarioConverter.paraUsuario(usuarioDTO);
+        Usuario usuario = usuarioMapper.paraUsuario(usuarioDTO);
         usuario = usuarioRepository.save(usuario);
         userProducer.publishMessageEmail(usuario);
-        return usuarioConverter.paraUsuarioDTO(usuario);
+        return usuarioMapper.paraUsuarioDTO(usuario);
     }
 
     public String autenticarUsuario(UsuarioDTO usuarioDTO) {
@@ -67,14 +67,10 @@ public class UsuarioService {
 
 
     public void emailExiste(String email){
-        try{
-            boolean existe = verificaEmailExistente(email);
-            if(existe){
-                throw new ConflictException("Email já cadastrado" + email);
-            }
-        }catch (ConflictException e ){
-            throw new ConflictException("Email já cadrastado" + e.getCause());
+        if(verificaEmailExistente(email)){
+            throw new ConflictException("Email já cadastrado: " + email);
         }
+
     }
 
 
@@ -87,7 +83,7 @@ public class UsuarioService {
     @Cacheable(value = "users", key = "#email")
     public UsuarioDTO buscaUsuarioPorEmail(String email){
         try {
-            return usuarioConverter.paraUsuarioDTO(
+            return usuarioMapper.paraUsuarioDTO(
                     usuarioRepository.findByEmail(email)
                             .orElseThrow(
                     () -> new ResourceNotFoundException("Email não encontrado" + email)
@@ -115,32 +111,29 @@ public class UsuarioService {
                 new ResourceNotFoundException("Email não encontrado" + email));
 
         //mesclou os dados que recebemos na requisição com os dados do banco de dados
-        Usuario usuario = usuarioConverter.updateUsuario(dto, usuarioEntity);
+        usuarioMapper.updateUsuario(dto, usuarioEntity);
 
 
         //salvou os dados do usuario convertidos e depois pegoui o retorno e converteu para usuarioDTO
-        return usuarioConverter.paraUsuarioDTO(usuarioRepository.save(usuario));
+        return usuarioMapper.paraUsuarioDTO(usuarioRepository.save(usuarioEntity));
     }
 
     @CacheEvict(value = "users", key = "#email")
     public EnderecoDTO atualizaEndereco(Long idEndereco, EnderecoDTO enderecoDTO, String email){
         // 1. Busca o endereço existente no banco
         Endereco entity = enderecoRepository.findById(idEndereco).orElseThrow(() ->
-                new ResourceNotFoundException("Id não encontrado " + idEndereco));
-        Endereco endereco = usuarioConverter.updateEndereco(enderecoDTO, entity);
-        Endereco enderecoSalvo = enderecoRepository.save(endereco);
-        return usuarioConverter.paraEnderecoDTO(enderecoSalvo);
+                new ResourceNotFoundException("Id não encontrado" + idEndereco));
+        usuarioMapper.updateEndereco(enderecoDTO, entity );
+        return usuarioMapper.paraEnderecoDTO(enderecoRepository.save(entity));
     }
 
     @CacheEvict(value = "users", key = "#email")
     public TelefoneDTO atualizaTelefone(Long idTelefone, TelefoneDTO dto, String email) {
         Telefone entity = telefoneRepository.findById(idTelefone).orElseThrow(() ->
                 new ResourceNotFoundException("Id não encontrado " + idTelefone));
+        usuarioMapper.updateTelefone(dto, entity );
 
-        Telefone telefone = usuarioConverter.updateTelefone(dto, entity);
-        Telefone telefoneSalvo = telefoneRepository.save(telefone);
-
-        return usuarioConverter.paraTelefoneDTO(telefoneSalvo);
+        return usuarioMapper.paraTelefoneDTO(telefoneRepository.save(entity));
     }
 
     @CacheEvict(value = "users", key = "#email")
@@ -148,9 +141,9 @@ public class UsuarioService {
         Usuario usuario = usuarioRepository.findByEmail(email).orElseThrow(() ->
                 new ResourceNotFoundException("Email não encontrado" + email));
 
-        Endereco endereco = usuarioConverter.paraEnderecoEntity(dto, usuario.getId());
+        Endereco endereco = usuarioMapper.paraEnderecoEntity(dto, usuario.getId());
         Endereco enderecoEntity = enderecoRepository.save(endereco);
-        return usuarioConverter.paraEnderecoDTO(enderecoEntity);
+        return usuarioMapper.paraEnderecoDTO(enderecoEntity);
     }
 
     @CacheEvict(value = "users", key = "#email")
@@ -158,8 +151,8 @@ public class UsuarioService {
         Usuario usuario = usuarioRepository.findByEmail(email).orElseThrow(() ->
                 new ResourceNotFoundException("Email não encontrado" + email));
 
-        Telefone telefone = usuarioConverter.paraTelefoneEntity(dto, usuario.getId());
+        Telefone telefone = usuarioMapper.paraTelefoneEntity(dto, usuario.getId());
         Telefone enderecoEntity = telefoneRepository.save(telefone);
-        return usuarioConverter.paraTelefoneDTO(enderecoEntity);
+        return usuarioMapper.paraTelefoneDTO(enderecoEntity);
     }
 }
